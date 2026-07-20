@@ -1,0 +1,48 @@
+{
+  "name": "glint",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "biome check",
+    "format": "biome format --write",
+    "test:x402": "tsx scripts/test-x402.ts",
+    "server:address": "tsx scripts/show-server-address.ts",
+    "contract:build": "cd contracts/tipjar && stellar contract build",
+    "contract:test": "cd contracts/tipjar && cargo test"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "@aztec/bb.js": "0.87.0",
+    "@google-cloud/firestore": "^8.5.0",
+    "@noble/hashes": "^1.5.0",
+    "@noir-lang/noir_js": "1.0.0-beta.9",
+    "@stellar/freighter-api": "^6.0.1",
+    "@stellar/stellar-sdk": "^14.6.1",
+    "@x402/core": "^2.9.0",
+    "@x402/fetch": "^2.9.0",
+    "@x402/stellar": "^2.9.0",
+    "axios": "^1.15.0",
+    "bip39": "^3.1.0",
+    "ed25519-hd-key": "^1.3.0",
+    "next": "16.2.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
+    "sonner": "^2.0.7",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^17.4.1",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}
