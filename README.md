@@ -1,6 +1,7 @@
 <div align="center">
 
-<!-- Paste banner screenshot here -->
+<img width="2849" height="1564" alt="Screenshot from 2026-07-20 16-58-12" src="https://github.com/user-attachments/assets/4a0445fb-b153-445b-8d53-57f78b7e6e95" />
+
 
 <img src="https://img.shields.io/badge/Stellar-Soroban-7B2FBE?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Rust-1.70%2B-red?style=for-the-badge" />
@@ -26,7 +27,7 @@
 | **Frontend (Vercel)** | https://glint-one-fawn.vercel.app/ |
 | **Backend / Relayer (Render)** | https://glint-1rtn.onrender.com |
 | **Stellar Expert** | https://stellar.expert/explorer/testnet |
-| **Demo Video** | _Add link_ |
+| **Demo Video** | [Drive Link](https://glint-one-fawn.vercel.app/) |
 
 ---
 
@@ -704,31 +705,28 @@ The relayer records every relayed action (withdraw/post/vote) and public tip int
 
 > The two ways to support, how the privacy works, featured creators.
 
-<!-- Paste desktop landing screenshot here -->
+<img width="2849" height="1564" alt="Screenshot from 2026-07-20 16-58-12" src="https://github.com/user-attachments/assets/5136fce5-7ed7-4399-b7c5-46e9bc2df50e" />
 
-### Creator Profile — Public Tip + Private Patronage
-
-> A creator's `/[slug]` page: public tip wall, private patronage actions, polls.
-
-<!-- Paste creator profile screenshot here -->
-
-### Wallet — Freighter Integration
-
-> `/wallet` — detect → connect → balance → send XLM, warm-paper themed.
-
-<!-- Paste wallet page screenshot here -->
 
 ### Mobile Responsive UI
 
 > Stacked single-column layout — every surface accessible on a phone.
 
-<!-- Paste mobile responsive screenshot here -->
+<div align="center">
+  <img
+    src="https://github.com/user-attachments/assets/c5c22a0f-2efc-409e-abe2-6226f282af19"
+    alt="Screenshot from 2026-07-20 16-58-51"
+    width="280"
+  />
+</div>
+
 
 ### CI/CD Pipeline Running
 
 > GitHub Actions — contract deploy → Render backend → Vercel frontend, all green.
 
-<!-- Paste CI/CD screenshot here -->
+<img width="2841" height="1109" alt="Screenshot from 2026-07-20 16-59-31" src="https://github.com/user-attachments/assets/c2ef9570-5b48-4755-b267-b0fa2ee729b6" />
+
 
 ---
 
