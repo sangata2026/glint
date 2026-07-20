@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/*
+ * Glint design tokens — "warm paper" aesthetic.
+ * Light mode only. Dark mode intentionally not implemented.
+ */
+:root {
+  /* Surfaces */
+  --color-bg: #f5f1e8; /* warm cream — page background */
+  --color-surface: #faf7ee; /* slightly lighter cream — card surface */
+  --color-surface-sunken: #ebe4d3; /* tan — inset fields / chips */
+
+  /* Ink */
+  --color-ink: #1c1a15; /* warm near-black */
+  --color-ink-soft: #5e574a; /* warm medium gray */
+  --color-ink-muted: #a8a195; /* warm light gray */
+
+  /* Lines */
+  --color-border: #e0d6be; /* soft tan border */
+  --color-border-strong: #c9bc9b; /* darker tan for hover / focus */
+
+  /* Accent — olive forest green (NOT black, NOT crypto neon) */
+  --color-accent: #3f4f1e;
+  --color-accent-hover: #4d5f28;
+  --color-accent-ink: #faf7ee; /* text on accent surfaces */
+
+  /* Semantic */
+  --color-success: #5c6b3e;
+  --color-error: #9c4a2e;
+  --color-warn: #a9782b;
+}
+
+@theme inline {
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-ink);
+
+  --color-surface: var(--color-surface);
+  --color-surface-sunken: var(--color-surface-sunken);
+
+  --color-ink: var(--color-ink);
+  --color-ink-soft: var(--color-ink-soft);
+  --color-ink-muted: var(--color-ink-muted);
+
+  --color-border-base: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-ink: var(--color-accent-ink);
+
+  --color-success: var(--color-success);
+  --color-error: var(--color-error);
+  --color-warn: var(--color-warn);
+
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-fraunces);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display serif utility — used for wordmark, hero, section titles, creator names */
+.font-display {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+
+/* Remove number input spinners (used in tip amount field) */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/*
+ * Tailwind v4 dropped the default `cursor: pointer` for `<button>` — restore
+ * it here so every clickable control feels right without each component
+ * having to remember. Disabled buttons revert to the not-allowed cursor.
+ */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/*
+ * Indeterminate progress strip — shown at the top of the tip form card
+ * while a tip is being signed / settled / recorded.
+ */
+@keyframes tipProgress {
+  0% {
+    left: -30%;
+    width: 30%;
+  }
+  50% {
+    width: 40%;
+  }
+  100% {
+    left: 100%;
+    width: 30%;
+  }
+}
+
+/*
+ * Highlight a tip-wall item when it first appears. Fades a warm olive
+ * wash over the item's background, scaling down to the normal surface.
+ */
+@keyframes newTipGlow {
+  0% {
+    background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+    box-shadow: 0 0 0 1px
+      color-mix(in srgb, var(--color-accent) 40%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 1px transparent;
+  }
+}
