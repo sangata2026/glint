@@ -26,6 +26,7 @@ export function HeaderNav() {
       ? { href: `/${mySlug}`, label: "My page" }
       : { href: "/create", label: "Create" },
     { href: "/dashboard", label: "Dashboard" },
+    { href: "/wallet", label: "Wallet" },
   ];
 
   return (
