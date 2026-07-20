@@ -1,0 +1,197 @@
+name: CD
+
+# Deploys on every push to main. Contracts deploy first (opt-in — needs
+# STELLAR_SECRET_KEY, skips by default). The backend (Render) and frontend
+# (Vercel) deploy unconditionally after, wired to the contract ids *this run*
+# just deployed when contracts actually redeployed, falling back to the
+# currently-live ids otherwise — so backend/frontend keep shipping on every
+# push even on runs where contracts didn't redeploy, and a redeployed contract
+# never silently goes unused because a downstream service still points at a
+# stale id.
+#
+# Glint's frontend and backend are the same Next.js app: the Render deployment
+# serves the API; the Vercel deployment proxies /api/* to Render via BACKEND_URL
+# (see next.config.ts). So contract ids live only on the backend (Render) — the
+# Vercel frontend just needs to know where the backend is.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ────────────────────── Deploy smart contracts ──────────────────────
+  deploy-contract:
+    name: Deploy contracts (Stellar testnet)
+    runs-on: ubuntu-latest
+    outputs:
+      tipjar: ${{ steps.addresses.outputs.tipjar }}
+      patronage: ${{ steps.addresses.outputs.patronage }}
+      verifier: ${{ steps.addresses.outputs.verifier }}
+      deployed: ${{ steps.addresses.outputs.deployed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (+ wasm32v1-none target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none
+
+      - name: Cache Cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            contracts/tipjar
+            contracts/patronage
+
+      # Fallback system libs in case binstall has to compile from source
+      # (stellar-cli's hardware-wallet/keyring crates link dbus-1 and libudev).
+      - name: Install Stellar CLI build deps
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev libudev-dev pkg-config
+
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
+      # Pulls the prebuilt stellar binary — no native compilation needed.
+      - name: Install Stellar CLI
+        run: cargo binstall --no-confirm stellar-cli
+
+      - name: Deploy and initialize contracts
+        id: addresses
+        env:
+          STELLAR_SECRET_KEY: ${{ secrets.STELLAR_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$STELLAR_SECRET_KEY" ]; then
+            echo "::warning::STELLAR_SECRET_KEY not set — skipping contract deploy. Add it in repo Settings → Secrets and variables → Actions to enable this job."
+            echo "deployed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Import the funded deployer key under the CLI identity the app's
+          # hd-wallet derivation and the README deploy steps expect.
+          printf '%s\n' "$STELLAR_SECRET_KEY" | stellar keys add glint-server --secret-key --overwrite
+          ADMIN=$(stellar keys public-key glint-server)
+
+          echo "==> Building the two in-repo Soroban contracts..."
+          (cd contracts/tipjar    && stellar contract build)
+          (cd contracts/patronage && stellar contract build)
+
+          echo "==> Deploying + initializing the TipJar (public tip wall)..."
+          TIPJAR=$(stellar contract deploy \
+            --wasm contracts/tipjar/target/wasm32v1-none/release/tipjar.wasm \
+            --source glint-server --network testnet)
+          stellar contract invoke --id "$TIPJAR" --source glint-server --network testnet \
+            -- init --admin "$ADMIN"
+
+          # The pool cross-calls an external UltraHonk verifier that fits the
+          # testnet compute budget. Build + deploy it against the in-repo VK.
+          echo "==> Building + deploying the UltraHonk verifier..."
+          git clone --depth 1 https://github.com/yugocabrio/rs-soroban-ultrahonk
+          (cd rs-soroban-ultrahonk/contracts/rs-soroban-ultrahonk && stellar contract build)
+          VERIFIER=$(stellar contract deploy \
+            --wasm rs-soroban-ultrahonk/target/wasm32v1-none/release/rs_soroban_ultrahonk.wasm \
+            --source glint-server --network testnet \
+            -- --vk_bytes-file-path circuits/patronage/target/vk)
+
+          echo "==> Deploying the patronage pool (wired to verifier + USDC SAC)..."
+          USDC=$(stellar contract id asset --asset \
+            USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5 --network testnet)
+          PATRONAGE=$(stellar contract deploy \
+            --wasm contracts/patronage/target/wasm32v1-none/release/patronage.wasm \
+            --source glint-server --network testnet \
+            -- --admin "$ADMIN" --verifier "$VERIFIER" --token "$USDC")
+
+          # Surface the fresh ids as job outputs so deploy-backend and
+          # deploy-frontend below wire against what was *actually just deployed*.
+          {
+            echo "tipjar=$TIPJAR"
+            echo "patronage=$PATRONAGE"
+            echo "verifier=$VERIFIER"
+            echo "deployed=true"
+          } >> "$GITHUB_OUTPUT"
+
+  # ────────────────────────── Deploy backend ───────────────────────────
+  deploy-backend:
+    name: Deploy backend (Render)
+    runs-on: ubuntu-latest
+    needs: [deploy-contract]
+    # No dependency on deploy-contract actually deploying — contract deploy is
+    # opt-in (needs STELLAR_SECRET_KEY) and skips by default. The backend still
+    # needs to ship on every push; it just doesn't rewrite its contract-id env
+    # vars unless deploy-contract produced genuinely new ids this run.
+    steps:
+      - name: Update Render env vars (if contracts redeployed) and redeploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          CONTRACTS_DEPLOYED: ${{ needs.deploy-contract.outputs.deployed }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then
+            echo "::warning::RENDER_API_KEY / RENDER_SERVICE_ID not set — skipping backend redeploy. Add both in repo Settings → Secrets and variables → Actions to enable this job."
+            exit 0
+          fi
+
+          if [ "$CONTRACTS_DEPLOYED" = "true" ]; then
+            # PUT .../env-vars/{key} upserts ONE variable — unlike the plural
+            # .../env-vars endpoint (full replace), this cannot clobber unrelated
+            # backend config (mnemonic, x402 settings, store type, port, etc).
+            set_env_var() {
+              curl -sf -X PUT "https://api.render.com/v1/services/$RENDER_SERVICE_ID/env-vars/$1" \
+                -H "Authorization: Bearer $RENDER_API_KEY" \
+                -H "Content-Type: application/json" \
+                -d "{\"value\": \"$2\"}" > /dev/null
+              echo "    set $1"
+            }
+
+            echo "==> Contracts were redeployed — updating backend env vars to the new ids..."
+            set_env_var TIPJAR_CONTRACT_ID    "${{ needs.deploy-contract.outputs.tipjar }}"
+            set_env_var PATRONAGE_CONTRACT_ID "${{ needs.deploy-contract.outputs.patronage }}"
+            set_env_var VERIFIER_CONTRACT_ID  "${{ needs.deploy-contract.outputs.verifier }}"
+          else
+            echo "==> Contracts were not redeployed this run — leaving backend env vars as-is."
+          fi
+
+          echo "==> Triggering Render deploy..."
+          curl -sf -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": "do_not_clear"}'
+
+  # ────────────────────────── Deploy frontend ──────────────────────────
+  deploy-frontend:
+    name: Deploy frontend (Vercel)
+    runs-on: ubuntu-latest
+    needs: [deploy-contract, deploy-backend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (production)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::warning::VERCEL_TOKEN not set — skipping Vercel deploy. Add it in repo Settings → Secrets and variables → Actions to enable this job."
+            exit 0
+          fi
+
+          # .vercel/project.json is gitignored; VERCEL_ORG_ID + VERCEL_PROJECT_ID
+          # env vars are Vercel's documented way to skip interactive `vercel link`.
+          #
+          # The Vercel frontend proxies /api/* to the Render backend (BACKEND_URL,
+          # see next.config.ts), so contract ids live on the backend, not here —
+          # the frontend only needs to know where the backend is, plus the public
+          # Stellar RPC endpoints the browser reads directly.
+          npx --yes vercel deploy --prod --yes --token "$VERCEL_TOKEN" \
+            -b BACKEND_URL="${{ vars.BACKEND_URL || 'https://glint-1rtn.onrender.com' }}" \
+            -b NEXT_PUBLIC_HORIZON_URL=https://horizon-testnet.stellar.org \
+            -b NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
