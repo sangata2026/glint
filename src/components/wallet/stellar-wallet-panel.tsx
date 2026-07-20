@@ -7,11 +7,16 @@
  * detect → connect → balance → send → tx hash. All state lives in the
  * `useWallet` hook; this file only renders and wires buttons.
  *
+ * Styled with the glint "warm paper" design tokens (Card/Button primitives,
+ * CSS custom properties) so it reads as the same product as the landing page.
+ *
  * `detectFreighter`, `connectWallet`, and `signTx` are imported explicitly from
  * the wallet lib per the Level 1 spec (connect/sign run through the hook, but
  * the panel owns extension detection on mount).
  */
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { useWallet } from "@/hooks/use-stellar-wallet";
 import {
   connectWallet,
@@ -26,6 +31,14 @@ const STELLAR_G_ADDRESS = /^G[A-Z0-9]{55}$/;
 // connect/sign happen inside the hook — keeps tree-shaking from dropping them.
 void connectWallet;
 void signTx;
+
+const INPUT_CLASS =
+  "w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-sunken)] " +
+  "px-3 py-2 text-sm text-[var(--color-ink)] outline-none transition-colors " +
+  "placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-border-strong)]";
+
+const FIELD_LABEL_CLASS =
+  "block text-xs font-mono uppercase tracking-wider text-[var(--color-ink-muted)] mb-1.5";
 
 function explorerTxUrl(hash: string): string {
   return `https://stellar.expert/explorer/testnet/tx/${hash}`;
@@ -86,145 +99,190 @@ export function StellarWalletPanel() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6 rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-neutral-900">
+    <Card padding="lg" className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-xl font-semibold">Freighter Wallet</h1>
-        <p className="text-sm text-neutral-500">
-          Stellar <span className="font-medium">Testnet</span> ·{" "}
-          <span className="font-mono text-xs">{HORIZON_TESTNET_URL}</span>
+        <div className="font-mono text-xs uppercase tracking-wider text-[var(--color-ink-muted)]">
+          Freighter · Stellar Testnet
+        </div>
+        <h2 className="font-display text-2xl">Wallet</h2>
+        <p className="font-mono text-xs text-[var(--color-ink-muted)] break-all">
+          {HORIZON_TESTNET_URL}
         </p>
       </header>
 
       {/* 1 — Install prompt */}
       {hasFreighter === false && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-          Freighter extension not detected.{" "}
+        <Card
+          sunken
+          padding="sm"
+          className="text-sm !border-[var(--color-warn)]"
+        >
+          <span className="text-[var(--color-ink-soft)]">
+            Freighter extension not detected.{" "}
+          </span>
           <a
             href="https://freighter.app"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold underline"
+            className="font-medium text-[var(--color-warn)] underline underline-offset-2"
           >
             Install Freighter
           </a>
-        </div>
+        </Card>
       )}
 
       {/* 2 — Connect / disconnect */}
       {hasFreighter !== false && !isConnected && (
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
           onClick={connect}
           disabled={isLoading}
-          className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
         >
           {isLoading ? "Connecting…" : "Connect Wallet"}
-        </button>
+        </Button>
       )}
 
       {isConnected && (
-        <div className="space-y-4">
-          <div className="rounded-lg bg-neutral-50 p-4 dark:bg-neutral-800/60">
-            <div className="text-xs uppercase tracking-wide text-neutral-500">
-              Connected address
+        <div className="space-y-5">
+          <Card sunken padding="md">
+            <div className={FIELD_LABEL_CLASS}>Connected address</div>
+            <div className="break-all font-mono text-sm text-[var(--color-ink)]">
+              {address}
             </div>
-            <div className="mt-1 break-all font-mono text-sm">{address}</div>
             <button
               type="button"
               onClick={disconnect}
-              className="mt-3 text-sm font-medium text-red-600 hover:underline"
+              className="mt-3 text-sm font-medium text-[var(--color-error)] hover:underline underline-offset-2"
             >
               Disconnect
             </button>
-          </div>
+          </Card>
 
           {/* 3 — Balance */}
-          <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-            <div className="text-xs uppercase tracking-wide text-neutral-500">
-              XLM Balance
-            </div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums">
+          <Card sunken padding="md">
+            <div className={FIELD_LABEL_CLASS}>XLM Balance</div>
+            <div className="font-display text-4xl text-[var(--color-ink)] tabular-nums">
               {balance === null ? (
-                <span className="text-neutral-400">—</span>
+                <span className="text-[var(--color-ink-muted)]">—</span>
               ) : balanceIsZeroUnfunded ? (
                 <span>
-                  0 XLM{" "}
-                  <span className="text-sm font-normal text-neutral-500">
-                    (account not funded)
+                  0{" "}
+                  <span className="text-2xl text-[var(--color-ink-muted)]">
+                    XLM
+                  </span>
+                  <span className="block font-sans text-sm text-[var(--color-ink-muted)]">
+                    account not funded
                   </span>
                 </span>
               ) : (
-                `${balance} XLM`
+                <span>
+                  {balance}{" "}
+                  <span className="text-2xl text-[var(--color-ink-muted)]">
+                    XLM
+                  </span>
+                </span>
               )}
             </div>
-            <button
-              type="button"
-              onClick={refreshBalance}
-              disabled={isLoading}
-              className="mt-3 rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-neutral-100 disabled:opacity-50 dark:border-white/15 dark:hover:bg-neutral-800"
-            >
-              {isLoading ? "Refreshing…" : "Refresh Balance"}
-            </button>
-          </div>
+            <div className="mt-4">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={refreshBalance}
+                disabled={isLoading}
+              >
+                {isLoading ? "Refreshing…" : "Refresh Balance"}
+              </Button>
+            </div>
+          </Card>
 
           {/* 4 — Send form */}
-          <form
-            onSubmit={handleSend}
-            className="space-y-3 rounded-lg border border-black/10 p-4 dark:border-white/10"
-          >
-            <div className="text-sm font-medium">Send XLM</div>
-            <input
-              type="text"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder="Destination G-address"
-              className="w-full rounded-md border border-black/15 bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-indigo-500 dark:border-white/15"
-            />
-            <input
-              type="number"
-              step="0.0000001"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Amount (XLM)"
-              className="w-full rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-indigo-500 dark:border-white/15"
-            />
-            <button
+          <form onSubmit={handleSend} className="space-y-4">
+            <h3 className="font-display text-xl">Send XLM</h3>
+            <div>
+              <label htmlFor="wallet-destination" className={FIELD_LABEL_CLASS}>
+                Destination address
+              </label>
+              <input
+                id="wallet-destination"
+                type="text"
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                placeholder="G…"
+                className={`${INPUT_CLASS} font-mono`}
+              />
+            </div>
+            <div>
+              <label htmlFor="wallet-amount" className={FIELD_LABEL_CLASS}>
+                Amount (XLM)
+              </label>
+              <input
+                id="wallet-amount"
+                type="number"
+                step="0.0000001"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.0000000"
+                className={`${INPUT_CLASS} font-mono`}
+              />
+            </div>
+            <Button
               type="submit"
+              variant="primary"
+              size="lg"
+              fullWidth
               disabled={sending || isLoading}
-              className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
             >
               {sending ? "Sending…" : "Send XLM"}
-            </button>
+            </Button>
           </form>
 
           {/* 4 — Tx feedback */}
           {txHash && (
-            <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
-              Transaction sent! Hash:{" "}
-              <a
-                href={explorerTxUrl(txHash)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="break-all font-mono font-semibold underline"
-              >
-                {txHash}
-              </a>
-            </div>
+            <Card
+              sunken
+              padding="sm"
+              className="text-sm !border-[var(--color-success)]"
+            >
+              <div className="font-medium text-[var(--color-success)]">
+                Transaction sent!
+              </div>
+              <div className="mt-1 text-[var(--color-ink-soft)]">
+                Hash:{" "}
+                <a
+                  href={explorerTxUrl(txHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all font-mono font-medium text-[var(--color-success)] underline underline-offset-2"
+                >
+                  {txHash}
+                </a>
+              </div>
+            </Card>
           )}
           {sendError && (
-            <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
+            <Card
+              sunken
+              padding="sm"
+              className="text-sm !border-[var(--color-error)] text-[var(--color-error)] break-words"
+            >
               {sendError}
-            </div>
+            </Card>
           )}
         </div>
       )}
 
       {error && !sendError && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
+        <Card
+          sunken
+          padding="sm"
+          className="text-sm !border-[var(--color-error)] text-[var(--color-error)] break-words"
+        >
           {error}
-        </div>
+        </Card>
       )}
-    </div>
+    </Card>
   );
 }
